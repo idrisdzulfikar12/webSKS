@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 25, 2024 at 12:01 AM
+-- Generation Time: Dec 25, 2024 at 06:12 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -41,7 +41,7 @@ CREATE TABLE `inputmhs` (
 --
 
 INSERT INTO `inputmhs` (`id`, `namaMhs`, `nim`, `ipk`, `sks`, `matakuliah`) VALUES
-(1, 'idris', 'A11.2021.11234', 3.4, 24, NULL),
+(1, 'idris', 'A11.2021.11234', 3.4, 24, 'Interaksi Manusia Dan Komputer'),
 (2, 'cvsfsdf', '21321243', 2, 20, NULL);
 
 -- --------------------------------------------------------
@@ -80,28 +80,12 @@ CREATE TABLE `jwl_mhs` (
   `ruangan` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
-
 --
--- Table structure for table `krs`
+-- Dumping data for table `jwl_mhs`
 --
 
-CREATE TABLE `krs` (
-  `id` int(11) NOT NULL,
-  `id_mhs` int(11) NOT NULL,
-  `id_matkul` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `krs`
---
-
-INSERT INTO `krs` (`id`, `id_mhs`, `id_matkul`) VALUES
-(1, 1, 1),
-(2, 1, 1),
-(9, 1, 1),
-(10, 2, 1),
-(11, 2, 1);
+INSERT INTO `jwl_mhs` (`id`, `mhs_id`, `matakuliah`, `sks`, `kelp`, `ruangan`) VALUES
+(2, 1, 'Interaksi Manusia Dan Komputer', 3, 'A11.3982', 'H.4.5');
 
 --
 -- Indexes for dumped tables
@@ -128,12 +112,6 @@ ALTER TABLE `jwl_mhs`
   ADD KEY `mhs_id` (`mhs_id`);
 
 --
--- Indexes for table `krs`
---
-ALTER TABLE `krs`
-  ADD PRIMARY KEY (`id`);
-
---
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -153,13 +131,7 @@ ALTER TABLE `jwl_matakuliah`
 -- AUTO_INCREMENT for table `jwl_mhs`
 --
 ALTER TABLE `jwl_mhs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `krs`
---
-ALTER TABLE `krs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- Constraints for dumped tables
