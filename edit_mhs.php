@@ -17,7 +17,7 @@ $queryMatkul = "SELECT * FROM jwl_matakuliah";
 $resultMatkul = $conn->query($queryMatkul);
 
 // Mendapatkan mata kuliah yang sudah diambil
-$queryKrs = "SELECT * FROM krs WHERE id_mhs = ?";
+$queryKrs = "SELECT * FROM jwl_mhs WHERE mhs_id = ?";
 $stmtKrs = $conn->prepare($queryKrs);
 $stmtKrs->bind_param("i", $idMhs);
 $stmtKrs->execute();
@@ -27,15 +27,43 @@ $stmtKrs->close();
 // Menangani form tambah mata kuliah
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $idMatkul = $_POST['id_matkul'];
+    // Pastikan id_matkul adalah integer
+    $idMatkul = intval($idMatkul);
+    $queryIdMatkul = "SELECT * FROM jwl_matakuliah WHERE id = $idMatkul";
+    $resultIdMatkul = $conn->query($queryIdMatkul);
+    $rowIdMatkul = $resultIdMatkul->fetch_assoc();
+    $Matkul = $rowIdMatkul['matakuliah'];
+    $sks = $rowIdMatkul['sks'];
+    $kelp = $rowIdMatkul['kelp'];
+    $ruangan = $rowIdMatkul['ruangan'];
 
-    $insertKrs = "INSERT INTO krs (id_mhs, id_matkul) VALUES (?, ?)";
-    $stmtInsert = $conn->prepare($insertKrs);
-    $stmtInsert->bind_param("ii", $idMhs, $idMatkul);
+    $conn->begin_transaction();
+    try {
+        // Insert ke tabel jwl_mhs
+        $insertKrs = "INSERT INTO jwl_mhs (mhs_id, matakuliah, sks, kelp, ruangan) VALUES (?, ?, ?, ?, ?)";
+        $stmtInsert = $conn->prepare($insertKrs);
+        $stmtInsert->bind_param("isiss", $idMhs, $Matkul, $sks, $kelp, $ruangan);
 
-    if ($stmtInsert->execute()) {
+        if (!$stmtInsert->execute()) {
+            throw new Exception("Gagal menambahkan mata kuliah: " . $stmtInsert->error);
+        }
+
+        // Update tabel inputmhs
+        $insertInputmhs = "UPDATE inputmhs JOIN (
+            SELECT mhs_id, GROUP_CONCAT(matakuliah SEPARATOR ', ') AS matakuliah 
+            FROM jwl_mhs GROUP BY mhs_id
+        ) AS subquery ON inputmhs.id = subquery.mhs_id
+        SET inputmhs.matakuliah = subquery.matakuliah;";
+
+        if (!$conn->query($insertInputmhs)) {
+            throw new Exception("Gagal memperbarui tabel inputmhs: " . $conn->error);
+        }
+
+        $conn->commit();
         $successMessage = "Mata kuliah berhasil ditambahkan.";
-    } else {
-        $errorMessage = "Gagal menambahkan mata kuliah: " . $stmtInsert->error;
+    } catch (Exception $e) {
+        $conn->rollback();
+        $errorMessage = $e->getMessage();
     }
 
     $stmtInsert->close();
@@ -48,27 +76,52 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // Menangani hapus mata kuliah dari KRS
 if (isset($_GET['hapus'])) {
     if (isset($_GET['id'])) {
-        $idKrs = $_GET['hapus'];
-        $idMhs = $_GET['id'];
+        $idKrs = intval($_GET['hapus']);
+        $idMhs = intval($_GET['id']);
 
-        // Debugging output to check if the URL parameters are correct
-        echo "Deleting KRS with ID: $idKrs for student ID: $idMhs";
+        // Debugging output to check if the URL parameters are correct (optional, can be removed in production)
+        // echo "Deleting KRS with ID: $idKrs for student ID: $idMhs";
 
-        // Prepare the SQL DELETE statement
-        $deleteKrs = "DELETE FROM krs WHERE id = ?";
-        $stmtDelete = $conn->prepare($deleteKrs);
-        $stmtDelete->bind_param("i", $idKrs);
+        $conn->begin_transaction();
+        try {
+            // Hapus data tabel jwl_mhs
+            $deleteKrs = "DELETE FROM jwl_mhs WHERE id = ?";
+            $stmtDelete = $conn->prepare($deleteKrs);
+            $stmtDelete->bind_param("i", $idKrs);
 
-        // Execute the delete statement
-        if ($stmtDelete->execute()) {
+            // Execute the delete statement
+            if (!$stmtDelete->execute()) {
+                throw new Exception("Gagal menghapus mata kuliah: " . $stmtDelete->error);
+            }
+
+            $stmtDelete->close();
+
+            // Update tabel inputmhs
+            $updateInputmhs = "UPDATE inputmhs 
+                LEFT JOIN (
+                    SELECT mhs_id, GROUP_CONCAT(matakuliah SEPARATOR ', ') AS matakuliah 
+                    FROM jwl_mhs GROUP BY mhs_id
+                ) AS subquery ON inputmhs.id = subquery.mhs_id
+                SET inputmhs.matakuliah = COALESCE(subquery.matakuliah, '') 
+                WHERE inputmhs.id = ?";
+            
+            $stmtUpdate = $conn->prepare($updateInputmhs);
+            $stmtUpdate->bind_param("i", $idMhs);
+
+            if (!$stmtUpdate->execute()) {
+                throw new Exception("Gagal memperbarui tabel inputmhs: " . $stmtUpdate->error);
+            }
+
+            $stmtUpdate->close();
+
+            $conn->commit();
             $successMessage = "Mata kuliah berhasil dihapus.";
-        } else {
-            $errorMessage = "Gagal menghapus mata kuliah: " . $stmtDelete->error;
+        } catch (Exception $e) {
+            $conn->rollback();
+            $errorMessage = $e->getMessage();
         }
 
-        $stmtDelete->close();
-
-        // After deletion, redirect back to the same page
+        // Redirect back to the same page
         header("Location: edit_mhs.php?id=$idMhs");
         exit;
     } else {
@@ -76,7 +129,6 @@ if (isset($_GET['hapus'])) {
         exit;
     }
 }
-
 ?>
 
 <!DOCTYPE html>
@@ -148,15 +200,8 @@ if (isset($_GET['hapus'])) {
                     <tbody>
                         <?php
                         $no = 1;
-                        while ($rowKrs = $resultKrs->fetch_assoc()) {
-                            // Mendapatkan detail mata kuliah dari ID
-                            $queryDetail = "SELECT * FROM jwl_matakuliah WHERE id = ?";
-                            $stmtDetail = $conn->prepare($queryDetail);
-                            $stmtDetail->bind_param("i", $rowKrs['id_matkul']);
-                            $stmtDetail->execute();
-                            $resultDetail = $stmtDetail->get_result();
-                            $dataMatkul = $resultDetail->fetch_assoc();
-                            $stmtDetail->close();
+                        while ($dataMatkul = $resultKrs->fetch_assoc()) {
+                        
                         ?>
                             <tr>
                                 <td><?php echo $no++; ?></td>
@@ -165,7 +210,7 @@ if (isset($_GET['hapus'])) {
                                 <td><?php echo $dataMatkul['kelp']; ?></td>
                                 <td><?php echo $dataMatkul['ruangan']; ?></td>
                                 <td>
-                                    <a href="input_krs.php?id=<?php echo $idMhs; ?>&hapus=<?php echo $rowKrs['id']; ?>" class="btn btn-danger btn-sm">Hapus</a>
+                                    <a href="edit_mhs.php?id=<?php echo $idMhs; ?>&hapus=<?php echo $dataMatkul['id']; ?>" class="btn btn-danger btn-sm">Hapus</a>
                                 </td>
                             </tr>
                         <?php } ?>
