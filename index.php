@@ -51,6 +51,14 @@ include('koneksi.php'); // Koneksi ke database
                 }
             }
         }
+
+        if (isset($_GET['message'])) {
+            if ($_GET['message'] == 'deleted') {
+                echo "<div class='alert alert-success'>Data berhasil dihapus!</div>";
+            } elseif ($_GET['message'] == 'error') {
+                echo "<div class='alert alert-danger'>Terjadi kesalahan saat menghapus data.</div>";
+            }
+        }
         ?>
 
         <table class="table table-bordered mt-4">
